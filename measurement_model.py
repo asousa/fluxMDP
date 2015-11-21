@@ -36,6 +36,7 @@ class measurement_model(object):
         self.mag_ind = 9;
         
     def get_measurement(self, in_time, coordinates, mode='continuous', bands=None):
+        ''' Take a flux measurement at a given time and location, with a given sensor setting'''
         # Get flashes within timeframe:
         flashes, flash_times = self.gld.load_flashes(in_time, self.td)
         flashes = flashes[:,(self.lat_ind, self.lon_ind, self.mag_ind, self.mag_ind)]
@@ -54,17 +55,14 @@ class measurement_model(object):
                 #print td.seconds - f[3]   
                 flux += np.sum( self.m.get_precip_at(f[0], coordinates.lat(), time_sampling_vector + f[3]) *
                           self.m.get_longitude_scaling(f[0], f[1], coordinates.lon(), I0=f[2]) * self.RES_DT )
-#                flux += np.sum(temp)
-                #print temp
-                
+
         if mode=='banded':
             for f in flashes:
                 flux += np.sum(( np.array([self.m.get_multiband_precip_at(f[0],
-                        coordinates.lat(), energy,
-                        time_sampling_vector + f[3]) for energy in bands]) *
-                        self.m.get_longitude_scaling(f[0], f[1], coordinates.lon(), I0=f[2]) * self.RES_DT ))
-#                flux += np.sum(temp)
-
+                    coordinates.lat(), energy,
+                    time_sampling_vector + f[3]) for energy in bands]) *
+                    self.m.get_longitude_scaling(f[0], f[1], coordinates.lon(), I0=f[2]) * self.RES_DT ))
+# #               
         
         
         return flux
@@ -90,8 +88,9 @@ if __name__== "__main__":
     sat.compute(plottime)
     sat.coords.transform_to('geomagnetic')
 
-    #print "From banded measurement (all on):"
-    #print f.get_measurement(plottime, sat.coords, mode='banded',bands=f.m.E_bands)
+    # bands is a list of energy bands to sample at (depending on database, 1 thru 8)
+    print "From banded measurement (all on):"
+    print f.get_measurement(plottime, sat.coords, mode='banded',bands=f.m.E_bands)
     print "From single measurement:"
     print f.get_measurement(plottime, sat.coords, mode='continuous',bands=f.m.E_bands)
 

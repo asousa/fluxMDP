@@ -31,11 +31,11 @@ class precip_model(object):
             obj = self.db[i]
             N.append(obj.N)
             S.append(obj.S)
-        print np.shape(N)
+        
         N = np.array(N).swapaxes(1,2)
         S = np.array(S).swapaxes(1,2)
         self.I0 = obj.I0
-        print np.shape(N)
+        
         self.N_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), obj.t), N, fill_value=0,bounds_error=False)
         self.S_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), obj.t), S, fill_value=0,bounds_error=False)
     
@@ -76,7 +76,7 @@ class precip_model(object):
             return self.S_interp(inps)
 
 
-    def get_precip_at(self, in_lat, out_lat, energy, t, hemisphere = "N"):
+    def get_multiband_precip_at(self, in_lat, out_lat, energy, t, hemisphere = "N"):
         if not self.multiple_bands:
             print "No multi-band!"
         else:
