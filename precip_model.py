@@ -57,7 +57,7 @@ class precip_model(object):
             self.S_E_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), self.E_bands, obj.t), S_E, fill_value=0,bounds_error=False)
 
 
-    def get_precip_at(self, in_lat, out_lat, t, hemisphere = "N"):
+    def get_precip_at(self, in_lat, out_lat, t):
         ''' in_lat:  Flash latitude (degrees)
             out_lat: Satellite latitude (degrees)
             t:       Time elapsed from flash (seconds)
@@ -67,25 +67,37 @@ class precip_model(object):
         # print t
         #inps = np.array([t for t in itertools.product(*[np.array(in_lat),np.array(out_lat),np.array(t)])])
 
-        inps = self.tile_keys(np.array([in_lat, out_lat]), t)
-
+        #inps = self.tile_keys(np.array([in_lat, out_lat]), t)
         #print "inps: ", inps
-        if hemisphere=="N":
-            return self.N_interp(inps)
-        else:
+
+        # Model is symmetric around northern / southern hemispheres (mag. dipole coordinates):
+        # If in = N, out = N  --> Northern hemisphere
+        #    in = N, out = S  --> Southern hemisphere
+        #    in = S, out = N  --> Southern hemisphere
+        #    in = S, out = S  --> Northern hemisphere
+        use_southern_hemi = (in_lat > 0) ^ (out_lat > 0)
+
+        inps = self.tile_keys(np.array([np.abs(in_lat), np.abs(out_lat)]), t)
+
+        if use_southern_hemi:
             return self.S_interp(inps)
+        else:
+            return self.N_interp(inps)
 
 
-    def get_multiband_precip_at(self, in_lat, out_lat, energy, t, hemisphere = "N"):
+    def get_multiband_precip_at(self, in_lat, out_lat, energy, t):
         if not self.multiple_bands:
             print "No multi-band!"
         else:
-            inps = self.tile_keys(np.array([in_lat, out_lat, energy]), t)
 
-        if hemisphere=="N":
-            return self.N_E_interp(inps)
-        else:
-            return self.N_E_interp(inps)
+            use_southern_hemi = (in_lat > 0) ^ (out_lat > 0)
+            inps = self.tile_keys(np.array([np.abs(in_lat), np.abs(out_lat), energy]), t)
+
+            # inps = self.tile_keys(np.array([in_lat, out_lat, energy]), t)
+            if use_southern_hemi:
+                return self.S_E_interp(inps)
+            else:
+                return self.N_E_interp(inps)
 
 
     def tile_keys(self, key1, key2):

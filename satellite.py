@@ -23,8 +23,10 @@ class Satellite(object):
 
   def coords_at(self,plotdate):
     self.tle_rec.compute(plotdate)
-    return self.coords
+    return self.tle_rec.hour()
   
+  def local_time():
+    return ephem
   #def coords(self):
   #  return [(180.0/math.pi)*self.tle_rec.sublong, (180.0/math.pi)*self.tle_rec.sublat]
 

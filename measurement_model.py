@@ -62,9 +62,7 @@ class measurement_model(object):
                     coordinates.lat(), energy,
                     time_sampling_vector + f[3]) for energy in bands]) *
                     self.m.get_longitude_scaling(f[0], f[1], coordinates.lon(), I0=f[2]) * self.RES_DT ))
-# #               
-        
-        
+# #            
         return flux
 
 if __name__== "__main__":
