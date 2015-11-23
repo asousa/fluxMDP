@@ -240,6 +240,9 @@ while cur_time < stop_time:
             pickle.dump(reward_table,file)
             reward_table = []
 
+        with open(outDir + '/Q_i%g.pkl' % ind,'wb') as file:
+            pickle.dump(Q,file)
+            
         for act in gActs:
             fig, ax = plt.subplots(2,2)
             ax = ax.flat
