@@ -1,7 +1,7 @@
 
 import numpy as np
 import pickle
-from build_database import flux_obj
+#from build_database import flux_obj
 from scipy import interpolate
 # from sklearn.svm import SVR
 # from sklearn.svm import NuSVR
@@ -30,15 +30,15 @@ class precip_model(object):
         S = []
         for i in in_lats:
             obj = self.db[i]
-            N.append(obj.N)
-            S.append(obj.S)
+            N.append(obj['N'])
+            S.append(obj['S'])
         
         N = np.array(N).swapaxes(1,2)
         S = np.array(S).swapaxes(1,2)
-        self.I0 = obj.I0
+        self.I0 = obj['I0']
         
-        self.N_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), obj.t), N, fill_value=0,bounds_error=False)
-        self.S_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), obj.t), S, fill_value=0,bounds_error=False)
+        self.N_interp = interpolate.RegularGridInterpolator((in_lats, obj['coords'].lat(), obj['t']), N, fill_value=0,bounds_error=False)
+        self.S_interp = interpolate.RegularGridInterpolator((in_lats, obj['coords'].lat(), obj['t']), S, fill_value=0,bounds_error=False)
     
         if multiple_bands:
             # Split into multiple bands -- input latitude, output latitude, energy, time.
@@ -46,16 +46,16 @@ class precip_model(object):
             S_E = []
             for i in in_lats:
                 obj = self.db[i]
-                N_E.append(obj.N_E)
-                S_E.append(obj.S_E)
+                N_E.append(obj['N_E'])
+                S_E.append(obj['S_E'])
 
             N_E = np.array(N_E).swapaxes(1,3)
             S_E = np.array(S_E).swapaxes(1,3)
 #            print np.shape(N_E)
             self.E_bands = np.linspace(1,np.shape(N_E)[2], np.shape(N_E)[2])
 #            print self.E_bands
-            self.N_E_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), self.E_bands, obj.t), N_E, fill_value=0,bounds_error=False)
-            self.S_E_interp = interpolate.RegularGridInterpolator((in_lats, obj.coords.lat(), self.E_bands, obj.t), S_E, fill_value=0,bounds_error=False)
+            self.N_E_interp = interpolate.RegularGridInterpolator((in_lats, obj['coords'].lat(), self.E_bands, obj['t']), N_E, fill_value=0,bounds_error=False)
+            self.S_E_interp = interpolate.RegularGridInterpolator((in_lats, obj['coords'].lat(), self.E_bands, obj['t']), S_E, fill_value=0,bounds_error=False)
 
 
     def get_precip_at(self, in_lat, out_lat, t):
@@ -124,10 +124,10 @@ class precip_model(object):
 
 if __name__ =="__main__":
 
-    m = precip_model("database_counts.pkl",multiple_bands=True)
+    m = precip_model("database_dicts.pkl",multiple_bands=True)
 
     t = np.linspace(0,30,300)
-    tmp = m.get_precip_at(30,45,5,t,"N")
+    tmp = m.get_multiband_precip_at(30,45,5,t)
 
     plt.plot(t,tmp)
     plt.show()

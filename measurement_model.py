@@ -1,6 +1,6 @@
 import numpy as np
 import pickle
-from build_database import flux_obj
+#from build_database import flux_obj
 from GLD_file_tools import GLD_file_tools
 from satellite import Satellite
 import datetime
@@ -21,8 +21,8 @@ class measurement_model(object):
     
         self.m = precip_model(database, multiple_bands)
         
-        self.RES_DT = self.m.db[self.m.db.keys()[0]].RES_DT
-        self.RES_FINT = self.m.db[self.m.db.keys()[0]].RES_FINT
+        self.RES_DT = self.m.db[self.m.db.keys()[0]]['RES_DT']
+        self.RES_FINT = self.m.db[self.m.db.keys()[0]]['RES_FINT']
         
         
         self.td = datetime.timedelta(seconds = 5 + self.RES_FINT) # Maximum previous time to examine flashes in. 
@@ -71,9 +71,9 @@ class measurement_model(object):
 
 if __name__== "__main__":
 # -------------- Here's how to create a satellite and take some flux measurements: -------------
-    GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
-    NLDN_root = 'alex/array/home/Vaisala/feed_data/NLDN'
-
+    #GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
+    #NLDN_root = 'alex/array/home/Vaisala/feed_data/NLDN'
+    GLD_root = 'GLD'
     sat_TLE  = ["1 40378U 15003C   15293.75287141  .00010129  00000-0  48835-3 0  9990",
                 "2 40378  99.1043 350.5299 0153633 201.4233 158.0516 15.09095095 39471"]
 
@@ -81,7 +81,7 @@ if __name__== "__main__":
     sat = Satellite(sat_TLE[0], sat_TLE[1],'Firebird 4')
 
     # Measurement object:
-    f = measurement_model(database = "database_test.pkl", multiple_bands = True)
+    f = measurement_model(database = "database_dicts.pkl", GLD_root = GLD_root, multiple_bands = True)
 
     # ---- Do The Thing:
     inTime = "2015-11-01T00:45:00"

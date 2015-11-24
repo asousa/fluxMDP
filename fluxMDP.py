@@ -5,7 +5,7 @@
 
 import numpy as np
 import pickle
-from build_database import flux_obj
+#from build_database import flux_obj
 from scipy import interpolate
 import matplotlib.pyplot as plt
 #from matplotlib import pyplot as plt
@@ -80,7 +80,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             outDir = 'MDP_saves',
             gActs  = ['continuous','off']):
 
-    db_name = "database_saturday.pkl"
+    db_name = "database_dicts.pkl"
 
     print "Database name: ", db_name
     print "start time: ", start_time
@@ -259,7 +259,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             reward_table.append(cv)
 
             
-            # if (np.mod(ind,10)==0):
+            #if (np.mod(ind,10)==0):
             if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
 
                 print "Saving progress..."
