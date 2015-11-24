@@ -39,7 +39,7 @@ class measurement_model(object):
         ''' Take a flux measurement at a given time and location, with a given sensor setting'''
         # Get flashes within timeframe:
         flashes, flash_times = self.gld.load_flashes(in_time, self.td)
-        if flashes == None:
+        if flashes is None:
             print "No flashes found at ", in_time
             return 0.0
 

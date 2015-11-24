@@ -96,9 +96,9 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     print "Actions: ", gActs
 
     # ------------------- Initial setup --------------------
-    GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
-    NLDN_root = 'alex/array/home/Vaisala/feed_data/NLDN'
-
+    # GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
+    # NLDN_root = 'alex/array/home/Vaisala/feed_data/NLDN'
+    GLD_root = 'GLD'
 
     sat_TLE  = ["1 40378U 15003C   15293.75287141  .00010129  00000-0  48835-3 0  9990",
                 "2 40378  99.1043 350.5299 0153633 201.4233 158.0516 15.09095095 39471"]
@@ -107,7 +107,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     sat = Satellite(sat_TLE[0], sat_TLE[1],'Firebird 4')
 
     # Measurement object:
-    f = measurement_model(database = db_name, multiple_bands = True)
+    f = measurement_model(database = db_name, GLD_root=GLD_root, multiple_bands = True)
 
     # Start time:
     # start_time = "2015-11-01T00:45:00"
@@ -193,7 +193,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
                 action = np.random.choice(gActs)
                 a = gActs.index(action)
 
-            print "Feeling", brains,":",action
+            #print "Feeling", brains,":",action
 
             #action = 'continuous' #random.choice(gActs)
             #a = gActs.index(action)
@@ -259,8 +259,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             reward_table.append(cv)
 
             
-            if (np.mod(ind,10)==0):
-            #if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
+            # if (np.mod(ind,10)==0):
+            if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
 
                 print "Saving progress..."
 
