@@ -39,6 +39,10 @@ class measurement_model(object):
         ''' Take a flux measurement at a given time and location, with a given sensor setting'''
         # Get flashes within timeframe:
         flashes, flash_times = self.gld.load_flashes(in_time, self.td)
+        if flashes == None:
+            print "No flashes found at ", in_time
+            return 0.0
+
         flashes = flashes[:,(self.lat_ind, self.lon_ind, self.mag_ind, self.mag_ind)]
         flash_coords = transform_coords(flashes[:,0], flashes[:,1], np.zeros_like(flashes[:,0]), 'geographic', 'geomagnetic')
         flashes[:,:2] = flash_coords[:,:2]

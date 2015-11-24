@@ -70,7 +70,9 @@ def get_time_scaling(grid_times, cur_coords, cur_time):
 def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             stop_time = datetime.datetime(2015,11,1,2,45,00),
             storage_penalty = 1,
+            detector_area = 1e3,
             switching_penalty = 0.05,
+            smoothing_radius = 1000,
             alpha = 0.9,
             gamma = 0.1,
             greed_rate = 2,
@@ -78,10 +80,14 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             outDir = 'MDP_saves',
             gActs  = ['continuous','off']):
 
+    db_name = "database_saturday.pkl"
+
+    print "Database name: ", db_name
     print "start time: ", start_time
     print "stop time: ", stop_time
     print "storage penalty: ", storage_penalty
     print "switching penalty: ", switching_penalty
+    print "smoothing radius: ", smoothing_radius
     print "alpha: ", alpha
     print "gamma: ", gamma
     print "greed: ", greed
@@ -93,11 +99,6 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
     NLDN_root = 'alex/array/home/Vaisala/feed_data/NLDN'
 
-    # State space:
-    gLats  = np.linspace(-90,90,90)
-    gLons  = np.linspace(-180,180,180)
-    gTimes = np.linspace(0,24,4)
-    gActs  = ['continuous','off']
 
     sat_TLE  = ["1 40378U 15003C   15293.75287141  .00010129  00000-0  48835-3 0  9990",
                 "2 40378  99.1043 350.5299 0153633 201.4233 158.0516 15.09095095 39471"]
@@ -106,7 +107,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     sat = Satellite(sat_TLE[0], sat_TLE[1],'Firebird 4')
 
     # Measurement object:
-    f = measurement_model(database = "database_saturday.pkl", multiple_bands = True)
+    f = measurement_model(database = db_name, multiple_bands = True)
 
     # Start time:
     # start_time = "2015-11-01T00:45:00"
@@ -115,7 +116,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     #cur_time = datetime.datetime.strptime(start_time,  "%Y-%m-%dT%H:%M:%S")
 
     # Stop time:
-    stop_time = datetime.datetime(2015,11,1,1,45,00)
+    #stop_time = datetime.datetime(2015,11,1,2,45,00)
 
 
 
@@ -161,14 +162,13 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     # Q matrix
     Q = np.zeros([np.size(gLats), np.size(gLons), np.size(gTimes), np.size(gActs)])
 
-
     sat.compute(cur_time)
 
     # Get time scaling weights:
     time_weight = get_time_scaling(gTimes, sat.coords, cur_time)
     sat.coords.transform_to('geomagnetic')
     # Get distance interpolating weights:
-    map_weights = get_map_scaling(gLats, gLons, sat.coords)
+    map_weights = get_map_scaling(gLats, gLons, sat.coords, Rmax=smoothing_radius)
     # 3d weight (lat, lon, time):
     W = map_weights[:,:,None]*time_weight
 
@@ -205,11 +205,11 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             
             if action =='continuous':
                 meas = f.get_measurement(cur_time, sat.coords, mode='continuous')
-                reward = meas*1e4 - storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
+                reward = meas*detector_area - storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
 
             if action in ['low','mid','high']:
                 meas = f.get_measurement(cur_time, sat.coords, mode='banded',bands=bands[action])
-                reward = meas*1e4 - (len(bands[action])/8.0)*storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
+                reward = meas*detector_area - (len(bands[action])/8.0)*storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
 
 
 
@@ -231,7 +231,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             # Back to geomagnetic (time weights need geographic):
             sat.coords.transform_to('geomagnetic')
             # Get distance interpolating weights at t+1:
-            map_weights_next = get_map_scaling(gLats, gLons, sat.coords)
+            map_weights_next = get_map_scaling(gLats, gLons, sat.coords, Rmax=smoothing_radius)
             # 3d weight (lat, lon, time):
             W_next = map_weights_next[:,:,None]*time_weight_next
 
@@ -259,8 +259,10 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             reward_table.append(cv)
 
             
-            #if (np.mod(ind,10)==0):
-            if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
+            if (np.mod(ind,10)==0):
+            #if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
+
+                print "Saving progress..."
 
                 # Get greedier:
                 greed = greed*(1 + greed_rate/100.0)
@@ -288,6 +290,28 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
                     print "Save filename: ", figname
                     plt.savefig(figname)
 
+
+                # Policy plot
+                policy = np.argmax(Q, axis=3)
+                #print np.shape(policy)
+                #print np.min(policy)
+
+                fig, ax = plt.subplots(2,2)
+                ax = ax.flat
+
+                for x in range(np.size(gTimes)):
+                    ax[x].pcolor(gLons, gLats, policy[:,:,x])
+                    ax[x].set_title(gTimes[x])
+                    ax[x].axis('off')
+                    fig.suptitle('Policy Evaluation: %g iterations: \n%s' % (ind, cur_time))
+
+                figname = outDir + '/policy_%g_%s.png' % (ind, act)
+                print "save filename: ", figname
+                plt.savefig(figname)
+
+
+
+
         # except:
         #     print "Something messed up! Trying the next step"
         #     cur_time += tStep
@@ -295,4 +319,4 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             ind += 1
 
 if __name__ =='__main__':
-    fluxMDP(gActs='continuous')
+    fluxMDP(gActs=['off','continuous'])
