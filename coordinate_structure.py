@@ -18,7 +18,7 @@
 
 import numpy as np
 import itertools
-import geopy.distance
+#import geopy.distance
 #import numexpr as ne
 
 
@@ -29,8 +29,8 @@ class coordinate_structure(object):
         self.data = None
         self.xtra_data = None
         # Radius of the earth
-        #self.R_earth = 6.3710e6 # Meters
-        self.R_earth = geopy.distance.EARTH_RADIUS*1e3
+        self.R_earth = 6.3710e6 # Meters
+        #self.R_earth = geopy.distance.EARTH_RADIUS*1e3
 
         # Radians, degrees
         self.d2r = np.pi/180.0
