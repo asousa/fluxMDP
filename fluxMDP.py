@@ -91,7 +91,7 @@ stop_time = datetime.datetime(2015,11,1,1,45,00)
 gLats  = np.linspace(-90,90,90)
 gLons  = np.linspace(-180,180,180)
 gTimes = np.linspace(0,24,4)
-gActs  = ['continuous','off','low','mid','high']
+gActs  = ['low','off']
 
 bands = dict()
 bands['low'] = [1,2]

@@ -3,6 +3,7 @@ import numpy as np
 import geopy.distance
 from ionoAbsorp import ionoAbsorp
 from coordinate_structure import coordinate_structure
+import pickle
 
 def longitude_scaling(flash_coords, out_coords):
     ''' Returns dB attenuation of a wave, based on the WIPP ionosphere input model '''
