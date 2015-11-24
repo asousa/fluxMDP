@@ -8,13 +8,13 @@ from scipy import interpolate
 from matplotlib import pyplot as plt
 from coordinate_structure import coordinate_structure
 import itertools
-import geopy.distance
+#import geopy.distance
 
 
 
 class precip_model(object):
     def __init__(self,database="database.pkl", multiple_bands=False):
-        self.R_earth = geopy.distance.EARTH_RADIUS
+        self.R_earth = 6371e3 #geopy.distance.EARTH_RADIUS
         self.d2r = np.pi/180.0
         self.path_atten = -12 # db per 1000 km attenuation (approximation of decay for earth-ionsphere waveguide)
 
