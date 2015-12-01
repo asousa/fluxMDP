@@ -4,7 +4,7 @@
 
 
 
-run_nums=( 1 2 3 4 )
+run_nums=( 6 )
 
 
 for run in ${run_nums[@]}; do
