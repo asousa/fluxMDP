@@ -110,8 +110,15 @@ class precip_model(object):
             out_lon: vector of longitudes to compute at
         '''
 
-        dist_lon = (self.R_earth)*np.abs(inp_lon - out_lon)*self.d2r*np.cos(self.d2r*inp_lat)*1e-3
-        vals = dist_lon*self.path_atten
+        # ----------- Old version: In all your computed measurements, rats (12.2.2015) ----
+        #dist_lon = (self.R_earth)*np.abs(inp_lon - out_lon)*self.d2r*np.cos(self.d2r*inp_lat)*1e-3
+        #vals = dist_lon*self.path_atten
+
+        # ----------- New version: Actually works, does wraparound properly -------
+        b = np.cos(self.d2r*inp_lat)*np.sin(self.d2r*(inp_lon - out_lon)/2.0)
+        dist_lon = self.R_earth*2*np.arcsin(np.abs(b))
+
+        vals = dist_lon*self.path_atten/1000.0
 
         if db_scaling:
                 return vals

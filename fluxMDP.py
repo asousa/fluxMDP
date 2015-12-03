@@ -78,7 +78,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             greed_rate = 2,
             greed = 0.01,
             outDir = 'MDP_saves',
-            gActs  = ['continuous','off']):
+            gActs  = ['continuous','off'],
+            previous_measurements = None):
 
     db_name = "database_dicts.pkl"
 
@@ -94,6 +95,16 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     print "greed rate: ", greed_rate
     print "outDir: ",outDir
     print "Actions: ", gActs
+
+
+
+    if previous_measurements:
+        print "Loading previous measurements file " + previous_measurements
+        with open(previous_measurements,'rb') as file:
+            using_previous = True
+            prev_db = pickle.load(file)
+    else:
+        using_previous = False
 
     # ------------------- Initial setup --------------------
     # GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
@@ -113,6 +124,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     # start_time = "2015-11-01T00:45:00"
     tStep = datetime.timedelta(seconds=30) # Step size thru model
     cur_time = start_time
+    mid_time = start_time + datetime.timedelta(days=15) # Midpoint of greediness-increasing curve
+    max_greed = 0.95  # Maximum greed asypmtote
     #cur_time = datetime.datetime.strptime(start_time,  "%Y-%m-%dT%H:%M:%S")
 
     # Stop time:
@@ -123,7 +136,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     # State space:
     gLats  = np.linspace(-90,90,90)
     gLons  = np.linspace(-180,180,180)
-    gTimes = np.linspace(0,24,4)
+    #gTimes = np.linspace(0,24,4)
+    gTimes = np.linspace(0,24,1)
     # gActs  = ['continuous','off','low','mid','high']
 
     bands = dict()
@@ -185,36 +199,70 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             prev_action = action
 
             brains = np.random.choice(['greedy','adventurous'],p=[greed, 1.0-greed])
+            print "Greed factor: ", greed 
+            # ------------------- Use previously-computed measurements only: ---------------------
+            if using_previous:
+                if cur_time in prev_db:
+                    avail_measurements = prev_db[cur_time].keys()
+                    Q_inds = [gActs.index(a) for a in avail_measurements if a in gActs]
+                    print "available measurements: ", avail_measurements
 
-            if brains =='greedy':
-                a = np.argmax([np.sum(Q[:,:,:,i]*W) for i in range(len(gActs))])
-                action = gActs[a]
-            elif brains =='adventurous':
-                action = np.random.choice(gActs)
-                a = gActs.index(action)
+                    if brains == 'greedy':
+                        a_tmp = np.argmax([np.sum(Q[:,:,:,i]*W) for i in Q_inds])
+                        a = Q_inds[a_tmp]
+                        action = gActs[a]
+                    elif brains == 'adventurous':
+                        a = np.random.choice(Q_inds)
+                        action = gActs[a]
+                
+                    meas = prev_db[cur_time][action]
 
-            #print "Feeling", brains,":",action
+                    if action =='off':
+                        reward = 0 - switching_penalty*(not(action==prev_action))
+                    elif action =='continuous':
+                        reward = meas*detector_area - storage_penalty - switching_penalty*(not(action==prev_action))
+                    elif action in ['low','mid','high']:
+                        reward = meas*detector_area - (len(bands[action])/8.0)*storage_penalty- switching_penalty*(not(action==prev_action))
+                else:
+                    # Missing stored data --- escape current iteration, increment clock, try again:
+                    cur_time += tStep
+                    continue
 
-            #action = 'continuous' #random.choice(gActs)
-            #a = gActs.index(action)
-            #print action
-            # take a measurement, calculate reward:
-            if action =='off':
-                meas = 0
-                reward = - switching_penalty*(not(action==prev_action))
-            
-            if action =='continuous':
-                meas = f.get_measurement(cur_time, sat.coords, mode='continuous')
-                reward = meas*detector_area - storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
+            else: 
+            # ------------------ Compute fresh measurements: -------------------------------------
 
-            if action in ['low','mid','high']:
-                meas = f.get_measurement(cur_time, sat.coords, mode='banded',bands=bands[action])
-                reward = meas*detector_area - (len(bands[action])/8.0)*storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
+                if brains =='greedy':
+                    a = np.argmax([np.sum(Q[:,:,:,i]*W) for i in range(len(gActs))])
+                    action = gActs[a]
+                elif brains =='adventurous':
+                    action = np.random.choice(gActs)
+                    a = gActs.index(action)
+
+                #print "Feeling", brains,":",action
+
+                #action = 'continuous' #random.choice(gActs)
+                #a = gActs.index(action)
+                #print action
+                # take a measurement, calculate reward:
+                if action =='off':
+                    meas = 0
+                    reward = 0 - switching_penalty*(not(action==prev_action))
+                
+                if action =='continuous':
+                    meas = np.sqrt(f.get_measurement(cur_time, sat.coords, mode='continuous'))
+                    # reward = meas*detector_area - storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
+                    reward = meas*detector_area - storage_penalty - switching_penalty*(not(action==prev_action))
+
+                if action in ['low','mid','high']:
+                    meas = np.sqrt(f.get_measurement(cur_time, sat.coords, mode='banded',bands=bands[action]))
+                    # reward = meas*detector_area - (len(bands[action])/8.0)*storage_penalty*(action not in ['off']) - switching_penalty*(not(action==prev_action))
+                    reward = meas*detector_area - (len(bands[action])/8.0) - switching_penalty*(not(action==prev_action))
 
 
 
 
-            cur_state_continuous = [sat.coords.lat()[0], sat.coords.lon()[0], cur_time,  action]
+            #cur_state_continuous = [sat.coords.lat()[0], sat.coords.lon()[0], cur_time,  action]
+            cur_state_continuous = [sat.coords, cur_time,  action]
             
             # Get Q(t,a)
             Qcur = np.sum(Q[:,:,:,a])*W
@@ -258,15 +306,18 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             print cv
             reward_table.append(cv)
 
+            # Increment greediness:
+
+            greed = max_greed/(1 + np.exp(-greed_rate*((cur_time - mid_time).total_seconds()/(24*3600))))
+
+            # if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
+            #     # Get greedier:
+            #     print "Getting greedier..."
+            #     greed = greed*(1 + greed_rate/100.0) 
             
-            #if (np.mod(ind,10)==0):
-            if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
 
+            if (np.mod(cur_time.day,2)==0) and (cur_time.hour ==0) and (cur_time.minute == 0) and (cur_time.second == 0):
                 print "Saving progress..."
-
-                # Get greedier:
-                greed = greed*(1 + greed_rate/100.0)
-
                 # Archive where we're at:
                 with open(outDir + '/data_i%g.pkl' % ind,'wb') as file:
                     pickle.dump(reward_table,file)
@@ -275,40 +326,66 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
                 with open(outDir + '/Q_i%g.pkl' % ind,'wb') as file:
                     pickle.dump(Q,file)
                     
+
+                ax_x = int(np.ceil(np.sqrt(len(gTimes))))
+                ax_y = 1
+
+                while (ax_x*ax_y < len(gTimes)):
+                    ax_y += 1
+
                 # Q plots
+
+                Q_clims = [np.min(Q), np.max(Q)]
                 for act in gActs:
-                    fig, ax = plt.subplots(2,2)
-                    ax = ax.flat
-                    for x in range(4):
-                        ax[x].pcolor(gLons, gLats, Q[:,:,x,gActs.index(act)]/np.max(Q))
-                        ax[x].set_title(gTimes[x])
-                        ax[x].axis('off')
-                        ax[x].scatter(sat.coords.lon(),sat.coords.lat(),marker='x')
+                    fig, ax = plt.subplots(ax_x, ax_y)
+
+                    if len(gTimes) == 1:
+                        ax.pcolor(gLons, gLats, Q[:,:,0,gActs.index(act)]/np.max(Q),clim=Q_clims)
+                        ax.set_title(gTimes[0])
+                        ax.axis('off')
+                        ax.scatter(sat.coords.lon(),sat.coords.lat(),marker='x')
                         fig.suptitle('action: %s, %g iterations: \n%s' % (act, ind, cur_time))
-                         
+                    else:
+
+                        ax = ax.flat
+                        for x in range(len(gTimes)):
+                            ax[x].pcolor(gLons, gLats, Q[:,:,x,gActs.index(act)]/np.max(Q), clim=Q_clims)
+                            ax[x].set_title(gTimes[x])
+                            ax[x].axis('off')
+                            ax[x].scatter(sat.coords.lon(),sat.coords.lat(),marker='x')
+                            fig.suptitle('action: %s, %g iterations: \n%s' % (act, ind, cur_time))
+                             
                     figname = outDir + '/Q_%g_%s.png' % (ind, act)
                     print "Save filename: ", figname
                     plt.savefig(figname)
 
+                plt.close(fig)
 
                 # Policy plot
                 policy = np.argmax(Q, axis=3)
                 #print np.shape(policy)
                 #print np.min(policy)
 
-                fig, ax = plt.subplots(2,2)
-                ax = ax.flat
+                fig, ax = plt.subplots(ax_x, ax_y)
 
-                for x in range(np.size(gTimes)):
-                    ax[x].pcolor(gLons, gLats, policy[:,:,x])
-                    ax[x].set_title(gTimes[x])
-                    ax[x].axis('off')
-                    fig.suptitle('Policy Evaluation: %g iterations: \n%s' % (ind, cur_time))
+                if len(gTimes) == 1:
+                    ax.pcolor(gLons, gLats, policy[:,:,0])
+                    ax.set_title(gTimes[0])
+                    ax.axis('off')
+
+                else:
+                    ax = ax.flat
+
+                    for x in range(np.size(gTimes)):
+                        ax[x].pcolor(gLons, gLats, policy[:,:,x])
+                        ax[x].set_title(gTimes[x])
+                        ax[x].axis('off')
+                        fig.suptitle('Policy Evaluation: %g iterations: \n%s' % (ind, cur_time))
 
                 figname = outDir + '/policy_%g_%s.png' % (ind, act)
                 print "save filename: ", figname
                 plt.savefig(figname)
-
+                plt.close(fig)
 
 
 
