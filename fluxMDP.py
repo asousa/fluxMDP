@@ -41,8 +41,8 @@ def get_map_scaling(grid_lats, grid_lons, in_coords, Rmax=1000):
     # Select entries around a small patch, and scale quadratically:
     weights = (np.maximum(0, Rmax - dists))**2
     # Normalize selection to 1
-#    return weights/np.sum(weights)
-    return weights/np.max(weights)
+    return weights/np.sum(weights)
+#    return weights/np.max(weights)
 
 
 def get_time_scaling(grid_times, cur_coords, cur_time):
@@ -77,10 +77,11 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             alpha = 0.9,
             gamma = 0.1,
             greed_rate = 2,
-            greed = 0.01,
+            fixed_greed = None,
             outDir = 'MDP_saves',
             gActs  = ['continuous','off'],
-            previous_measurements = None):
+            previous_measurements = None,
+            stored_policy = None):
 
     db_name = "database_dicts.pkl"
 
@@ -92,7 +93,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     print "smoothing radius: ", smoothing_radius
     print "alpha: ", alpha
     print "gamma: ", gamma
-    print "greed: ", greed
+    print "fixed_greed: ",fixed_greed
     print "greed rate: ", greed_rate
     print "outDir: ",outDir
     print "Actions: ", gActs
@@ -101,11 +102,12 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
 
     if previous_measurements:
         print "Loading previous measurements file " + previous_measurements
+        using_previous = True
         with open(previous_measurements,'rb') as file:
-            using_previous = True
             prev_db = pickle.load(file)
     else:
         using_previous = False
+
 
     # ------------------- Initial setup --------------------
     # GLD_root  = 'alex/array/home/Vaisala/feed_data/GLD'
@@ -134,12 +136,12 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
 
 
 
-    # State space:
-    gLats  = np.linspace(-90,90,90)
-    gLons  = np.linspace(-180,180,180)
-    #gTimes = np.linspace(0,24,4)
-    gTimes = np.linspace(0,24,1)
-    # gActs  = ['continuous','off','low','mid','high']
+    # # State space:
+    # gLats  = np.linspace(-90,90,90)
+    # gLons  = np.linspace(-180,180,180)
+    # #gTimes = np.linspace(0,24,4)
+    # gTimes = np.linspace(0,24,1)
+    # # gActs  = ['continuous','off','low','mid','high']
 
     bands = dict()
     bands['low'] = [1,2]
@@ -155,6 +157,34 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     # greed_rate = 2 # Percent increase per four hours
 
     # greed = 0.01
+    if fixed_greed:
+        greed = fixed_greed
+    else:
+        greed = 0
+
+
+    # outDir = 'MDP_saves'
+    if not os.path.exists(outDir):
+        os.makedirs(outDir)
+
+    reward_table = []
+
+    # Q matrix
+    if stored_policy:
+        print "Using previously-computed policy"
+        using_stored_policy = True
+        with open(stored_policy,'rb') as file:
+            Q = pickle.load(file)
+
+    else:  
+        using_stored_policy = False
+        Q = np.zeros([90, 180, 1, np.size(gActs)])
+
+    # State space:
+    gLats  = np.linspace(-90,90,np.shape(Q)[0])
+    gLons  = np.linspace(-180,180,np.shape(Q)[1])
+    gTimes = np.linspace(0,24,np.shape(Q)[2])
+
 
 
     # Start a file to periodically dump entries to:
@@ -165,17 +195,9 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     odb['actions'] = gActs
     odb['bands']   = bands
 
-    # outDir = 'MDP_saves'
-    if not os.path.exists(outDir):
-        os.makedirs(outDir)
-
     with open(outDir + '/odb.pkl','wb') as file:
         pickle.dump(odb, file)
 
-    reward_table = []
-
-    # Q matrix
-    Q = np.zeros([np.size(gLats), np.size(gLons), np.size(gTimes), np.size(gActs)])
 
     sat.compute(cur_time)
 
@@ -186,6 +208,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     map_weights = get_map_scaling(gLats, gLons, sat.coords, Rmax=smoothing_radius)
     # 3d weight (lat, lon, time):
     W = map_weights[:,:,None]*time_weight
+    print "W isnans: ",np.sum(np.isnan(W))
+    print "Q isnans: ",np.sum(np.isnan(Q))
 
     action = gActs[0]
 
@@ -268,6 +292,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             # Get Q(t,a)
             Qcur = np.sum(Q[:,:,:,a])*W
 
+            print "Qcur isnans: ",np.sum(np.isnan(Qcur))
+
             # increment timestep:
             cur_time += tStep
             
@@ -289,7 +315,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
         #    Qmax = np.max([np.sum(Q[:,:,i]*map_weights) for i in range(len(gActs))])
             Qmax = np.max([np.sum(Q[:,:,:,i]*W_next) for i in range(len(gActs))])
 
-            #print "Qmax: ",Qmax
+            print "Qmax: ",Qmax
             
             # update Q    
             # tmp2 = alpha*(reward + gamma*Qmax - Qcur)*map_weights
@@ -308,8 +334,8 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             reward_table.append(cv)
 
             # Increment greediness:
-
-            greed = max_greed/(1 + np.exp(-greed_rate*((cur_time - mid_time).total_seconds()/(24*3600))))
+            if not fixed_greed:
+                greed = max_greed/(1 + np.exp(-greed_rate*((cur_time - mid_time).total_seconds()/(24*3600))))
 
             # if (np.mod(cur_time.hour, 4)==0) and (cur_time.minute == 0) and (cur_time.second == 0):
             #     # Get greedier:
@@ -387,8 +413,6 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
                 print "save filename: ", figname
                 plt.savefig(figname)
                 plt.close(fig)
-
-
 
         # except:
         #     print "Something messed up! Trying the next step"
