@@ -229,17 +229,19 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             if using_previous:
                 if cur_time in prev_db:
                     avail_measurements = prev_db[cur_time].keys()
-                    Q_inds = [gActs.index(a) for a in avail_measurements if a in gActs]
+                    #Q_inds = [gActs.index(a) for a in avail_measurements if a in gActs]
                     print "available measurements: ", avail_measurements
 
                     if brains == 'greedy':
-                        a_tmp = np.argmax([np.sum(Q[:,:,:,i]*W) for i in Q_inds])
-                        a = Q_inds[a_tmp]
+                        #a_tmp = np.argmax([np.sum(Q[:,:,:,i]*W) for i in Q_inds])
+                        a = np.argmax([np.sum(Q[:,:,:,gActs.index(i)]*W) for i in gActs])
+                        #a = Q_inds[a_tmp]
                         action = gActs[a]
                     elif brains == 'adventurous':
-                        a = np.random.choice(Q_inds)
-                        action = gActs[a]
-                
+#                        a = np.random.choice(Q_inds)
+                        action = np.random.choice(gActs)
+                        #action = gActs[a]
+                        a = gActs.index(action)                
                     meas = prev_db[cur_time][action]
 
                     if action =='off':
@@ -267,7 +269,6 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
 
                 #action = 'continuous' #random.choice(gActs)
                 #a = gActs.index(action)
-                #print action
                 # take a measurement, calculate reward:
                 if action =='off':
                     meas = 0
@@ -284,15 +285,17 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
                     reward = meas*detector_area - (len(bands[action])/8.0) - switching_penalty*(not(action==prev_action))
 
 
+            print "action: ", action
 
 
             #cur_state_continuous = [sat.coords.lat()[0], sat.coords.lon()[0], cur_time,  action]
             cur_state_continuous = [sat.coords, cur_time,  action]
             
             # Get Q(t,a)
-            Qcur = np.sum(Q[:,:,:,a])*W
+            Qcur = np.sum(Q[:,:,:,a]*W)
 
-            print "Qcur isnans: ",np.sum(np.isnan(Qcur))
+            print "Qcur: ", Qcur
+
 
             # increment timestep:
             cur_time += tStep
@@ -322,7 +325,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             # print "tmp2 is: ",np.shape(tmp2)
             #Q[:,:,a] = Q[:,:,a] + alpha*(reward + gamma*Qmax - Qcur)*map_weights
             Q[:,:,:,a] = Q[:,:,:,a] + alpha*(reward + gamma*Qmax - Qcur)*W
-            
+            #raw_input("idling...")
             # Rename the weights for the next round:
             W = W_next
             # map_weights = map_weights_next
