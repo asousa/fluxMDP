@@ -41,7 +41,8 @@ def get_map_scaling(grid_lats, grid_lons, in_coords, Rmax=1000):
     # Select entries around a small patch, and scale quadratically:
     weights = (np.maximum(0, Rmax - dists))**2
     # Normalize selection to 1
-    return weights/np.sum(weights)
+#    return weights/np.sum(weights)
+    return weights/np.max(weights)
 
 
 def get_time_scaling(grid_times, cur_coords, cur_time):
