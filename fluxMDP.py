@@ -49,24 +49,26 @@ def get_time_scaling(grid_times, cur_coords, cur_time):
     '''Coarsely bin into a local time of day, with the idea that
     lightning has some hourly time dependence (i.e., rarely lightning in the morning)
     '''
-    d2r = np.pi/180.0
-    if not cur_coords.type=='geographic':
-        print "Not in Geographic coordinates!"
-    #    time_bins = np.linspace(0,23,4)             # Vector of times to quantize to
-    d = cur_coords.lon()[0]*24/360                   # Hour shift in longitude    
-    
-    # Local time, in fractional hours
-    LT = cur_time.hour + np.sign(d)*cur_time.minute/60.0 + d
-    
-    # Did we loop around a day?  (er, past the rounding point?)
-    if LT < grid_times[0] -np.size(grid_times):
-        LT += 24
-    if LT >= grid_times[-1] + np.size(grid_times):
-        LT -= 24
+    if len(grid_times)==1:
+        return 1.0
+    else:
+        d2r = np.pi/180.0
+        if not cur_coords.type=='geographic':
+            print "Not in Geographic coordinates!"
+        #    time_bins = np.linspace(0,23,4)             # Vector of times to quantize to
+        d = cur_coords.lon()[0]*24/360                   # Hour shift in longitude  
+        
+        LT = cur_time - datetime.timedelta(hours=d)
+        
+        d2r = np.pi/180.0
+        # Great circle distance, in radians -- haversine formula. V E C T O R I Z E D
+        b = np.sin(d2r*(360/24)*(LT.hour - grid_times)/2.0)
+        dists = 2*24*np.arcsin(np.abs(b))
 
-    dists = np.abs(LT - grid_times)
-    weights = (24 - dists)**2
-    return weights/np.sum(weights)
+        weights = np.maximum(0,(48 - dists))**2
+        return weights/np.sum(weights)
+
+
 
 def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             stop_time = datetime.datetime(2015,11,1,2,45,00),
@@ -81,7 +83,10 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
             outDir = 'MDP_saves',
             gActs  = ['continuous','off'],
             previous_measurements = None,
-            stored_policy = None):
+            stored_policy = None,
+            num_lats =90,
+            num_lons =180,
+            num_times=1):
 
     db_name = "database_dicts.pkl"
 
@@ -97,6 +102,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
     print "greed rate: ", greed_rate
     print "outDir: ",outDir
     print "Actions: ", gActs
+    print "num_times: ",num_times
 
 
 
@@ -178,7 +184,7 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
 
     else:  
         using_stored_policy = False
-        Q = np.zeros([90, 180, 1, np.size(gActs)])
+        Q = np.zeros([num_lats, num_lons, num_times, np.size(gActs)])
 
     # State space:
     gLats  = np.linspace(-90,90,np.shape(Q)[0])
@@ -187,13 +193,35 @@ def fluxMDP(start_time = datetime.datetime(2015,11,01,01,45,00),
 
 
 
-    # Start a file to periodically dump entries to:
+    # Log simulation parameters in a dictionary (text would have been fine too)
     odb = dict()
     odb['lats']    = gLats
     odb['lons']    = gLons
     odb['times']   = gTimes
     odb['actions'] = gActs
     odb['bands']   = bands
+    
+    odb['start_time'] = start_time
+    odb['stop_time'] = stop_time
+    odb['storage_penalty'] = storage_penalty
+    odb['detector_area'] = detector_area
+    odb['switching_penalty'] = switching_penalty
+    odb['smoothing_radius'] = smoothing_radius
+    odb['alpha'] = alpha
+    odb['gamma'] = gamma
+    odb['greed_rate'] = greed_rate
+    odb['fixed_greed'] = fixed_greed
+    odb['outDir'] = outDir
+    odb['gActs']  = gActs
+    odb['previous_measurements'] = previous_measurements
+    odb['stored_policy'] = stored_policy
+    odb['num_lats'] = num_lats
+    odb['num_lons'] = num_lons
+    odb['num_times']= num_times
+
+
+
+
 
     with open(outDir + '/odb.pkl','wb') as file:
         pickle.dump(odb, file)
